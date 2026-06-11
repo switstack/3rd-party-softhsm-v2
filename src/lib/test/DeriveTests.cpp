@@ -390,6 +390,68 @@ void DeriveTests::ecdhDerive(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hPubli
 	free(valAttrib.pValue);
 	CPPUNIT_ASSERT(rv == CKR_OK);
 }
+void DeriveTests::ecdhDerive(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hPublicKey, CK_OBJECT_HANDLE hPrivateKey, CK_OBJECT_HANDLE &hKey, CK_EC_KDF_TYPE kdfType, CK_BYTE_PTR pSharedData, CK_ULONG ulSharedDataLen, bool useRaw)
+{
+	CK_ATTRIBUTE valAttrib = { CKA_EC_POINT, NULL_PTR, 0 };
+	CK_RV rv = CRYPTOKI_F_PTR( C_GetAttributeValue(hSession, hPublicKey, &valAttrib, 1) );
+	CPPUNIT_ASSERT(rv == CKR_OK);
+	valAttrib.pValue = (CK_BYTE_PTR)malloc(valAttrib.ulValueLen);
+	rv = CRYPTOKI_F_PTR( C_GetAttributeValue(hSession, hPublicKey, &valAttrib, 1) );
+	CPPUNIT_ASSERT(rv == CKR_OK);
+
+	CK_ECDH1_DERIVE_PARAMS parms = { kdfType, ulSharedDataLen, pSharedData, 0, NULL_PTR };
+	// Use RAW or DER format
+	if (useRaw)
+	{
+		size_t offset = 0;
+		unsigned char* buf = (unsigned char*)valAttrib.pValue;
+		if (valAttrib.ulValueLen > 2 && buf[0] == 0x04)
+		{
+			if (buf[1] < 0x80)
+			{
+				offset = 2;
+			}
+			else
+			{
+				if (valAttrib.ulValueLen > ((buf[1] & 0x7F) + (unsigned int)2))
+				{
+					offset = 2 + (buf[1] & 0x7F);
+				}
+			}
+		}
+		parms.pPublicData = buf + offset;
+		parms.ulPublicDataLen = valAttrib.ulValueLen - offset;
+	}
+	else
+	{
+		parms.pPublicData = (unsigned char*)valAttrib.pValue;
+		parms.ulPublicDataLen = valAttrib.ulValueLen;
+	}
+
+	CK_MECHANISM mechanism = { CKM_ECDH1_DERIVE, NULL, 0 };
+	mechanism.pParameter = &parms;
+	mechanism.ulParameterLen = sizeof(parms);
+	CK_OBJECT_CLASS keyClass = CKO_SECRET_KEY;
+	CK_KEY_TYPE keyType = CKK_GENERIC_SECRET;
+	CK_BBOOL bFalse = CK_FALSE;
+	CK_BBOOL bTrue = CK_TRUE;
+	CK_ULONG secLen = 32;
+	CK_ATTRIBUTE keyAttribs[] = {
+		{ CKA_CLASS, &keyClass, sizeof(keyClass) },
+		{ CKA_KEY_TYPE, &keyType, sizeof(keyType) },
+		{ CKA_PRIVATE, &bFalse, sizeof(bFalse) },
+		{ CKA_SENSITIVE, &bFalse, sizeof(bFalse) },
+		{ CKA_EXTRACTABLE, &bTrue, sizeof(bTrue) },
+		{ CKA_VALUE_LEN, &secLen, sizeof(secLen) }
+	};
+
+	hKey = CK_INVALID_HANDLE;
+	rv = CRYPTOKI_F_PTR( C_DeriveKey(hSession, &mechanism, hPrivateKey,
+			 keyAttribs, sizeof(keyAttribs)/sizeof(CK_ATTRIBUTE),
+			 &hKey) );
+	free(valAttrib.pValue);
+	CPPUNIT_ASSERT(rv == CKR_OK);
+}
 #endif
 
 bool DeriveTests::compareSecret(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey1, CK_OBJECT_HANDLE hKey2)
@@ -577,7 +639,7 @@ void DeriveTests::testEddsaDerive(const char* alg)
 	if (strcmp(alg, "X448") == 0)
 		return;
 #endif
-	
+
 	CK_RV rv;
 	CK_SESSION_HANDLE hSessionRO;
 	CK_SESSION_HANDLE hSessionRW;

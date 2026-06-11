@@ -11090,6 +11090,61 @@ CK_RV SoftHSM::deriveDH
 	return rv;
 }
 
+#ifdef WITH_ECC
+bool deriveRawSharedSecretX963KDF(
+	const ByteString& secret, HashAlgorithm& hash, const ByteString& sharedData, size_t outputLen,
+	ByteString& output
+)
+{
+	uint32_t counter = 1;
+	ByteString counterBytes;
+	counterBytes.resize(sizeof(counter));
+	ByteString hashOutput;
+	const size_t hashOutputLen = static_cast<size_t>(hash.getHashSize());
+	size_t retainedHashOutputLen;
+	output.resize(outputLen);
+	unsigned char* outputIt = output.byte_str();
+	const unsigned char* outputEnd = (outputIt + output.size());
+
+	if (!hash.hashInit())
+	{
+		return false;
+	}
+	while (outputIt != outputEnd)
+	{
+		counterBytes[3] = (counter & 0x000000FF);
+		counterBytes[2] = ((counter & 0x0000FF00) >> 8);
+		counterBytes[1] = ((counter & 0x00FF0000) >> 16);
+		counterBytes[0] = ((counter & 0xFF000000) >> 24);
+
+		if (!hash.hashUpdate(secret))
+		{
+			return false;
+		}
+		if (!hash.hashUpdate(counterBytes))
+		{
+			return false;
+		}
+		if ((sharedData.bits() != 0) && !hash.hashUpdate(sharedData))
+		{
+			return false;
+		}
+		if (!hash.hashFinal(hashOutput))
+		{
+			return false;
+		}
+
+		retainedHashOutputLen = std::min<size_t>((outputEnd - outputIt), hashOutputLen);
+		memcpy(outputIt, hashOutput.const_byte_str(), retainedHashOutputLen);
+		outputIt += retainedHashOutputLen;
+
+		++counter;
+	}
+
+	return true;
+};
+#endif
+
 // Derive an ECDH secret
 #ifdef WITH_ECC
 CK_RV SoftHSM::deriveECDH
@@ -11111,16 +11166,35 @@ CK_RV SoftHSM::deriveECDH
 		DEBUG_MSG("pParameter must be of type CK_ECDH1_DERIVE_PARAMS");
 		return CKR_MECHANISM_PARAM_INVALID;
 	}
-	if (CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->kdf != CKD_NULL)
+	switch (CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->kdf)
 	{
-		DEBUG_MSG("kdf must be CKD_NULL");
-		return CKR_MECHANISM_PARAM_INVALID;
-	}
-	if ((CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->ulSharedDataLen != 0) ||
-	    (CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->pSharedData != NULL_PTR))
-	{
-		DEBUG_MSG("there must be no shared data");
-		return CKR_MECHANISM_PARAM_INVALID;
+		case CKD_NULL:
+			if ((CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->ulSharedDataLen != 0) ||
+				(CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->pSharedData != NULL_PTR))
+			{
+				DEBUG_MSG("there must be no shared data");
+				return CKR_MECHANISM_PARAM_INVALID;
+			}
+			break;
+		case CKD_SHA1_KDF:
+		case CKD_SHA224_KDF:
+		case CKD_SHA256_KDF:
+		case CKD_SHA384_KDF:
+		case CKD_SHA512_KDF:
+		{
+			const CK_BYTE_PTR sharedData = CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->pSharedData;
+			const CK_ULONG sharedDataLen = CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->ulSharedDataLen;
+			if (((sharedData == NULL_PTR) && (sharedDataLen != 0)) ||
+				((sharedData != NULL_PTR) && (sharedDataLen == 0)))
+			{
+				DEBUG_MSG("invalid shared data");
+				return CKR_MECHANISM_PARAM_INVALID;
+			}
+			break;
+		}
+		default:
+			DEBUG_MSG("KDF not supported");
+			return CKR_MECHANISM_PARAM_INVALID;
 	}
 	if ((CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->ulPublicDataLen == 0) ||
 	    (CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->pPublicData == NULL_PTR))
@@ -11223,6 +11297,34 @@ CK_RV SoftHSM::deriveECDH
 	if (ecdh == NULL)
 		return CKR_MECHANISM_INVALID;
 
+	// Get the hash algorithm handler as needed
+	HashAlgorithm* hash = NULL;
+	if (CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->kdf != CKD_NULL)
+	{
+		switch (CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->kdf)
+		{
+			case CKD_SHA1_KDF:
+				hash = CryptoFactory::i()->getHashAlgorithm(HashAlgo::SHA1);
+				break;
+			case CKD_SHA224_KDF:
+				hash = CryptoFactory::i()->getHashAlgorithm(HashAlgo::SHA224);
+				break;
+			case CKD_SHA256_KDF:
+				hash = CryptoFactory::i()->getHashAlgorithm(HashAlgo::SHA256);
+				break;
+			case CKD_SHA384_KDF:
+				hash = CryptoFactory::i()->getHashAlgorithm(HashAlgo::SHA384);
+				break;
+			case CKD_SHA512_KDF:
+				hash = CryptoFactory::i()->getHashAlgorithm(HashAlgo::SHA512);
+				break;
+			default:
+				return CKR_MECHANISM_INVALID;
+		}
+		if (hash == NULL)
+			return CKR_MECHANISM_INVALID;
+	}
+
 	// Get the keys
 	PrivateKey* privateKey = ecdh->newPrivateKey();
 	if (privateKey == NULL)
@@ -11257,13 +11359,76 @@ CK_RV SoftHSM::deriveECDH
 		return CKR_GENERAL_ERROR;
 	}
 
-	// Derive the secret
+	// Derive the raw secret
 	SymmetricKey* secret = NULL;
 	CK_RV rv = CKR_OK;
 	if (!ecdh->deriveKey(&secret, publicKey, privateKey))
 		rv = CKR_GENERAL_ERROR;
 	ecdh->recyclePrivateKey(privateKey);
 	ecdh->recyclePublicKey(publicKey);
+
+	ByteString secretValue = secret->getKeyBits();
+
+	// Determine the implicit size of the derived key for generic secrets and AES keys
+	if (byteLen == 0)
+	{
+		switch (keyType)
+		{
+			case CKK_GENERIC_SECRET:
+				byteLen = secretValue.size();
+				break;
+			case CKK_AES:
+				if (secretValue.size() >= 32)
+					byteLen = 32;
+				else if (secretValue.size() >= 24)
+					byteLen = 24;
+				else
+					byteLen = 16;
+				break;
+		}
+	}
+
+	// Derive the final secret from the raw secret
+	if (hash != NULL)
+	{
+		// Execute X9.63 KDF
+		const ByteString sharedData(CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->pSharedData,
+			CK_ECDH1_DERIVE_PARAMS_PTR(pMechanism->pParameter)->ulSharedDataLen);
+		ByteString output;
+
+		if (deriveRawSharedSecretX963KDF(secretValue, *hash, sharedData, byteLen, output))
+		{
+			secretValue = output;
+		}
+		else
+		{
+			rv = CKR_GENERAL_ERROR;
+		}
+	}
+	else
+	{
+		// Just truncate the raw secret
+		if (byteLen < secretValue.size())
+		{
+			secretValue.split(secretValue.size() - byteLen);
+		}
+	}
+	if (byteLen > secretValue.size())
+	{
+		INFO_MSG("The derived secret is too short");
+		rv = CKR_GENERAL_ERROR;
+	}
+
+	// Fix the odd parity for DES
+	if (keyType == CKK_DES ||
+		keyType == CKK_DES2 ||
+		keyType == CKK_DES3)
+	{
+		for (size_t i = 0; i < secretValue.size(); i++)
+		{
+			secretValue[i] = odd_parity[secretValue[i]];
+		}
+	}
 
 	// Create the secret object using C_CreateObject
 	const CK_ULONG maxAttribs = 32;
@@ -11330,85 +11495,43 @@ CK_RV SoftHSM::deriveECDH
 			}
 
 			// Secret Attributes
-			ByteString secretValue = secret->getKeyBits();
 			ByteString value;
 			ByteString plainKCV;
 			ByteString kcv;
 
-			// For generic and AES keys:
-			// default to return max size available.
-			if (byteLen == 0)
+			// Get the KCV
+			switch (keyType)
 			{
-				switch (keyType)
-				{
-					case CKK_GENERIC_SECRET:
-						byteLen = secretValue.size();
-						break;
-					case CKK_AES:
-						if (secretValue.size() >= 32)
-							byteLen = 32;
-						else if (secretValue.size() >= 24)
-							byteLen = 24;
-						else
-							byteLen = 16;
-				}
+				case CKK_GENERIC_SECRET:
+					secret->setBitLen(byteLen * 8);
+					plainKCV = secret->getKeyCheckValue();
+					break;
+				case CKK_DES:
+				case CKK_DES2:
+				case CKK_DES3:
+					secret->setBitLen(byteLen * 7);
+					plainKCV = ((DESKey*)secret)->getKeyCheckValue();
+					break;
+				case CKK_AES:
+					secret->setBitLen(byteLen * 8);
+					plainKCV = ((AESKey*)secret)->getKeyCheckValue();
+					break;
+				default:
+					bOK = false;
+					break;
 			}
 
-			if (byteLen > secretValue.size())
+			if (isPrivate)
 			{
-				INFO_MSG("The derived secret is too short");
-				bOK = false;
+				token->encrypt(secretValue, value);
+				token->encrypt(plainKCV, kcv);
 			}
 			else
 			{
-				// Truncate value when requested, remove from the leading end
-				if (byteLen < secretValue.size())
-					secretValue.split(secretValue.size() - byteLen);
-
-				// Fix the odd parity for DES
-				if (keyType == CKK_DES ||
-				    keyType == CKK_DES2 ||
-				    keyType == CKK_DES3)
-				{
-					for (size_t i = 0; i < secretValue.size(); i++)
-					{
-						secretValue[i] = odd_parity[secretValue[i]];
-					}
-				}
-
-				// Get the KCV
-				switch (keyType)
-				{
-					case CKK_GENERIC_SECRET:
-						secret->setBitLen(byteLen * 8);
-						plainKCV = secret->getKeyCheckValue();
-						break;
-					case CKK_DES:
-					case CKK_DES2:
-					case CKK_DES3:
-						secret->setBitLen(byteLen * 7);
-						plainKCV = ((DESKey*)secret)->getKeyCheckValue();
-						break;
-					case CKK_AES:
-						secret->setBitLen(byteLen * 8);
-						plainKCV = ((AESKey*)secret)->getKeyCheckValue();
-						break;
-					default:
-						bOK = false;
-						break;
-				}
-
-				if (isPrivate)
-				{
-					token->encrypt(secretValue, value);
-					token->encrypt(plainKCV, kcv);
-				}
-				else
-				{
-					value = secretValue;
-					kcv = plainKCV;
-				}
+				value = secretValue;
+				kcv = plainKCV;
 			}
+
 			bOK = bOK && osobject->setAttribute(CKA_VALUE, value);
 			if (checkValue)
 				bOK = bOK && osobject->setAttribute(CKA_CHECK_VALUE, kcv);
@@ -11427,6 +11550,10 @@ CK_RV SoftHSM::deriveECDH
 	// Clean up
 	ecdh->recycleSymmetricKey(secret);
 	CryptoFactory::i()->recycleAsymmetricAlgorithm(ecdh);
+	if (hash != NULL)
+	{
+		CryptoFactory::i()->recycleHashAlgorithm(hash);
+	}
 
 	// Remove secret that may have been created already when the function fails.
 	if (rv != CKR_OK)
