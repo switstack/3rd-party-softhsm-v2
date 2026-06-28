@@ -124,7 +124,7 @@ endif(DISABLE_NON_PAGED_MEMORY)
 
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-	# disable 
+	# disable
     # C4996 warning for deprecated posix function name
     # C4456 declaration of 'identifier' hides previous local declaration
 	set(COMPILE_OPTIONS "/MP;/W4;/wd4996;/wd4456")
@@ -320,7 +320,7 @@ elseif(WITH_CRYPTO_BACKEND STREQUAL "openssl")
         set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_ecc.c)
         try_run(RUN_ECC COMPILE_RESULT
                 "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-                LINK_LIBRARIES ${CRYPTO_LIBS}
+                LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
                 CMAKE_FLAGS
                     "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
                 )
@@ -341,7 +341,7 @@ elseif(WITH_CRYPTO_BACKEND STREQUAL "openssl")
         set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_ed25519.c)
         try_run(RUN_ED25519 COMPILE_RESULT
                 "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-                LINK_LIBRARIES ${CRYPTO_LIBS}
+                LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
                 CMAKE_FLAGS
                     "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
                 )
@@ -356,7 +356,7 @@ elseif(WITH_CRYPTO_BACKEND STREQUAL "openssl")
         set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_ed448.c)
         try_run(RUN_ED448 COMPILE_RESULT
                 "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-                LINK_LIBRARIES ${CRYPTO_LIBS}
+                LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
                 CMAKE_FLAGS
                     "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
                 )
@@ -375,7 +375,7 @@ elseif(WITH_CRYPTO_BACKEND STREQUAL "openssl")
         set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_gost.c)
         try_run(RUN_GOST COMPILE_RESULT
                 "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-                LINK_LIBRARIES ${CRYPTO_LIBS}
+                LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
                 CMAKE_FLAGS
                     "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
                 )
@@ -395,7 +395,7 @@ elseif(WITH_CRYPTO_BACKEND STREQUAL "openssl")
         set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_fips.c)
         try_run(RUN_FIPS COMPILE_RESULT
                 "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-                LINK_LIBRARIES ${CRYPTO_LIBS}
+                LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
                 CMAKE_FLAGS
                     "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
                 )
@@ -414,7 +414,7 @@ elseif(WITH_CRYPTO_BACKEND STREQUAL "openssl")
     set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_rfc3394.c)
     try_run(RUN_AES_KEY_WRAP COMPILE_RESULT
             "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-            LINK_LIBRARIES ${CRYPTO_LIBS}
+            LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
             CMAKE_FLAGS
                 "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
             )
@@ -429,7 +429,7 @@ elseif(WITH_CRYPTO_BACKEND STREQUAL "openssl")
     set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_rfc5649.c)
     try_run(RUN_AES_KEY_WRAP_PAD COMPILE_RESULT
             "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-            LINK_LIBRARIES ${CRYPTO_LIBS}
+            LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
             CMAKE_FLAGS
                 "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
             )
