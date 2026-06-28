@@ -3,6 +3,7 @@ project(softhsm2 C CXX)
 
 # Build Options
 option(BUILD_TESTS "Compile tests along with libraries" OFF)
+option(CHECK_CRYPTO_SUPPORT "Whether to check support for enabled cryptographic algorithms" ON)
 option(DISABLE_NON_PAGED_MEMORY "Disable non-paged memory for secure storage" OFF)
 option(DISABLE_VISIBILITY "Disables and unsets -fvisibility=hidden" OFF)
 option(ENABLE_64bit "Enable 64-bit compiling" OFF)
