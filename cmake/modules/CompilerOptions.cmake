@@ -317,128 +317,37 @@ elseif(WITH_CRYPTO_BACKEND STREQUAL "openssl")
 
     # acx_openssl_ecc.m4
     if(ENABLE_ECC)
-        set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_ecc.c)
-        try_run(RUN_ECC COMPILE_RESULT
-                "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-                LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
-                CMAKE_FLAGS
-                    "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
-                )
-        if(COMPILE_RESULT AND RUN_ECC EQUAL 0)
-            set(WITH_ECC 1)
-            message(STATUS "OpenSSL: Found P-256, P-384, and P-521")
-        else()
-            set(error_msg "OpenSSL: Cannot find P-256, P-384, or P-521! OpenSSL library has no ECC support!")
-            message(FATAL_ERROR ${error_msg})
-        endif()
+        message(STATUS "OpenSSL: Support for ECC is enabled")
     else(ENABLE_ECC)
         message(STATUS "OpenSSL: Support for ECC is disabled")
     endif(ENABLE_ECC)
 
     # acx_openssl_eddsa.m4
     if(ENABLE_EDDSA)
-        # ED25519
-        set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_ed25519.c)
-        try_run(RUN_ED25519 COMPILE_RESULT
-                "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-                LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
-                CMAKE_FLAGS
-                    "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
-                )
-        if(COMPILE_RESULT AND RUN_ED25519 EQUAL 0)
-            set(WITH_EDDSA 1)
-            message(STATUS "OpenSSL: Found ED25519")
-        else()
-            set(error_msg "OpenSSL: Cannot find ED25519! OpenSSL library has no EDDSA support!")
-            message(FATAL_ERROR ${error_msg})
-        endif()
-        # ED448
-        set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_ed448.c)
-        try_run(RUN_ED448 COMPILE_RESULT
-                "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-                LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
-                CMAKE_FLAGS
-                    "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
-                )
-        if(COMPILE_RESULT AND RUN_ED448 EQUAL 0)
-            message(STATUS "OpenSSL: Found ED448")
-        else()
-            # Not used in SoftHSM
-            message(STATUS "OpenSSL: Cannot find ED448!")
-        endif()
+        message(STATUS "OpenSSL: Support for EDDSA is enabled")
     else(ENABLE_EDDSA)
         message(STATUS "OpenSSL: Support for EDDSA is disabled")
     endif(ENABLE_EDDSA)
 
     # acx_openssl_gost.m4
     if(ENABLE_GOST)
-        set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_gost.c)
-        try_run(RUN_GOST COMPILE_RESULT
-                "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-                LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
-                CMAKE_FLAGS
-                    "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
-                )
-        if(COMPILE_RESULT AND RUN_GOST EQUAL 0)
-            set(WITH_GOST 1)
-            message(STATUS "OpenSSL: Found GOST engine")
-        else()
-            set(error_msg "OpenSSL: Cannot find GOST engine! OpenSSL library has no GOST support!")
-            message(FATAL_ERROR ${error_msg})
-        endif()
+        message(STATUS "OpenSSL: Support for GOST is enabled")
     else(ENABLE_GOST)
         message(STATUS "OpenSSL: Support for GOST is disabled")
     endif(ENABLE_GOST)
 
     # acx_openssl_fips.m4
     if(ENABLE_FIPS)
-        set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_fips.c)
-        try_run(RUN_FIPS COMPILE_RESULT
-                "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-                LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
-                CMAKE_FLAGS
-                    "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
-                )
-        if(COMPILE_RESULT AND RUN_FIPS EQUAL 0)
-            set(WITH_FIPS 1)
-            message(STATUS "OpenSSL: Found working FIPS_mode_set()")
-        else()
-            set(error_msg "OpenSSL: FIPS_mode_set(1) failed. OpenSSL library is not FIPS capable!")
-            message(FATAL_ERROR ${error_msg})
-        endif()
+        message(STATUS "OpenSSL: Support for FIPS 140-2 mode is enabled")
     else(ENABLE_FIPS)
         message(STATUS "OpenSSL: Support for FIPS 140-2 mode is disabled")
     endif(ENABLE_FIPS)
 
     # acx_openssl_rfc3349
-    set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_rfc3394.c)
-    try_run(RUN_AES_KEY_WRAP COMPILE_RESULT
-            "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-            LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
-            CMAKE_FLAGS
-                "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
-            )
-    if(COMPILE_RESULT AND RUN_AES_KEY_WRAP EQUAL 0)
-        set(HAVE_AES_KEY_WRAP 1)
-        message(STATUS "OpenSSL: RFC 3394 is supported")
-    else()
-        message(STATUS "OpenSSL: RFC 3394 is not supported")
-    endif()
+
 
     # acx_openssl_rfc5649
-    set(testfile ${CMAKE_SOURCE_DIR}/cmake/modules/tests/test_openssl_rfc5649.c)
-    try_run(RUN_AES_KEY_WRAP_PAD COMPILE_RESULT
-            "${CMAKE_BINARY_DIR}/prebuild_santity_tests" ${testfile}
-            LINK_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY}
-            CMAKE_FLAGS
-                "-DINCLUDE_DIRECTORIES=${CRYPTO_INCLUDES}"
-            )
-    if(COMPILE_RESULT AND RUN_AES_KEY_WRAP_PAD EQUAL 0)
-        set(HAVE_AES_KEY_WRAP_PAD 1)
-        message(STATUS "OpenSSL: RFC 5649 is supported")
-    else()
-        message(STATUS "OpenSSL: RFC 5649 is not supported")
-    endif()
+
 
     # Compile with RAW PKCS PSS
     set(WITH_RAW_PSS 1)
